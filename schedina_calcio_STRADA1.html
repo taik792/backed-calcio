@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<title>Schedina Calcio – Consigliata (Strada 1)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+body{
+    font-family: Arial, sans-serif;
+    background: linear-gradient(135deg,#0f2027,#203a43,#2c5364);
+    color:#fff;
+    margin:0;
+    padding:20px;
+}
+.container{
+    max-width:1100px;
+    margin:auto;
+    background:rgba(255,255,255,0.12);
+    padding:25px;
+    border-radius:16px;
+}
+h1,h2{text-align:center;}
+.controls{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+    gap:15px;
+    margin-bottom:20px;
+}
+select,button{
+    padding:14px;
+    font-size:16px;
+    border-radius:10px;
+    border:none;
+}
+button{
+    background:#27ae60;
+    color:#fff;
+    cursor:pointer;
+}
+button:hover{background:#2ecc71;}
+table{
+    width:100%;
+    border-collapse:collapse;
+    margin-top:20px;
+    background:#fff;
+    color:#000;
+    border-radius:10px;
+    overflow:hidden;
+}
+th,td{
+    padding:12px;
+    text-align:center;
+}
+th{
+    background:#2c3e50;
+    color:#fff;
+}
+.info{
+    margin-top:15px;
+    text-align:center;
+    font-weight:bold;
+}
+.badge{
+    display:inline-block;
+    padding:4px 8px;
+    background:#34495e;
+    color:#fff;
+    border-radius:6px;
+    font-size:12px;
+}
+.tag{
+    font-size:12px;
+    padding:3px 6px;
+    border-radius:6px;
+    background:#f39c12;
+    color:#000;
+}
+.footer{
+    margin-top:30px;
+    text-align:center;
+    font-size:14px;
+    opacity:0.85;
+}
+.box{
+    background:rgba(0,0,0,0.25);
+    padding:15px;
+    border-radius:12px;
+    margin-top:20px;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+<h1>⚽ Schedina Calcio</h1>
+<h2>Consigliata del giorno</h2>
+
+<div class="controls">
+    <div>
+        <strong>Giorno</strong><br>
+        <select id="giorno">
+            <option value="today">Oggi</option>
+            <option value="tomorrow">Domani</option>
+        </select>
+    </div>
+    <div>
+        <strong>Numero eventi</strong><br>
+        <select id="num">
+            <option>2</option>
+            <option selected>3</option>
+            <option>4</option>
+            <option>5</option>
+            <option>6</option>
+        </select>
+    </div>
+    <div>
+        <strong>Campionato preferito</strong><br>
+        <select id="filtro">
+            <option value="ALL">Nessuna preferenza</option>
+            <option value="Serie A">Serie A</option>
+            <option value="Serie B">Serie B</option>
+            <option value="Premier">Premier League</option>
+            <option value="Liga">Liga</option>
+            <option value="Bundesliga">Bundesliga</option>
+            <option value="Ligue">Ligue 1</option>
+        </select>
+    </div>
+</div>
+
+<button onclick="genera()">Genera schedina consigliata</button>
+
+<div class="info" id="info"></div>
+
+<div class="box">
+<table id="tabella" style="display:none">
+<thead>
+<tr>
+    <th>Campionato</th>
+    <th>Partita</th>
+    <th>Data</th>
+    <th>Pronostico</th>
+    <th>Quota</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+</div>
+
+<div class="box" id="quotaBox" style="display:none">
+<h2>Quota Totale</h2>
+<h1 id="quotaTotale">-</h1>
+</div>
+
+<div class="footer">Creato da Rosario</div>
+</div>
+
+<script>
+const BACKEND = "https://backed-calcio.onrender.com/partite";
+const pronostici = [
+  {tipo:"1", quota:1.70},
+  {tipo:"X", quota:3.20},
+  {tipo:"2", quota:2.10},
+  {tipo:"Over 1.5", quota:1.45},
+  {tipo:"Over 2.5", quota:1.85},
+  {tipo:"Goal", quota:1.75}
+];
+
+async function genera(){
+    const giorno = document.getElementById("giorno").value;
+    const n = parseInt(document.getElementById("num").value);
+    const filtro = document.getElementById("filtro").value;
+    const info = document.getElementById("info");
+
+    info.innerHTML = "Analisi schedina in corso...";
+    document.getElementById("tabella").style.display="none";
+    document.getElementById("quotaBox").style.display="none";
+
+    const res = await fetch(BACKEND+"?giorno="+giorno);
+    let dati = await res.json();
+
+    let preferiti = dati;
+    let messaggio = "";
+
+    if(filtro !== "ALL"){
+        preferiti = dati.filter(p => p.lega && p.lega.toLowerCase().includes(filtro.toLowerCase()));
+        if(preferiti.length === 0){
+            messaggio = "⚠️ Il campionato preferito non è disponibile oggi. Ti proponiamo le migliori alternative.";
+            preferiti = dati;
+        }
+    }
+
+    if(preferiti.length === 0){
+        info.innerHTML = "Nessuna partita disponibile nei dati gratuiti.";
+        return;
+    }
+
+    preferiti.sort(() => 0.5 - Math.random());
+    const selezionate = preferiti.slice(0, Math.min(n,preferiti.length));
+
+    let quotaTot = 1;
+    const tbody = document.querySelector("#tabella tbody");
+    tbody.innerHTML = "";
+
+    selezionate.forEach(p=>{
+        const pr = pronostici[Math.floor(Math.random()*pronostici.length)];
+        quotaTot *= pr.quota;
+        tbody.innerHTML += `
+        <tr>
+            <td><span class="badge">${p.lega}</span></td>
+            <td>${p.casa} - ${p.trasferta}</td>
+            <td>${p.data}</td>
+            <td><strong>${pr.tipo}</strong></td>
+            <td>${pr.quota.toFixed(2)}</td>
+        </tr>`;
+    });
+
+    document.getElementById("tabella").style.display="table";
+    document.getElementById("quotaBox").style.display="block";
+    document.getElementById("quotaTotale").innerHTML = quotaTot.toFixed(2);
+    info.innerHTML = messaggio || "Schedina consigliata pronta.";
+}
+</script>
+
+</body>
+</html>
