@@ -6,7 +6,7 @@ app.use(cors());
 
 const PORT = process.env.PORT || 3000;
 
-// Campionati supportati (TheSportsDB)
+// Campionati supportati (ID TheSportsDB)
 const LEAGUES = [
   { id: 4332, name: "Serie A" },
   { id: 4394, name: "Serie B" },
@@ -18,11 +18,13 @@ const LEAGUES = [
 ];
 
 app.get("/", (req, res) => {
-  res.send("Backend calcio attivo ✅");
+  res.send("Backend calcio attivo ✅ (versione stabile)");
 });
 
-function formatDate(d){
-  return d.toISOString().split("T")[0];
+function sameDay(d1, d2){
+  return d1.getFullYear() === d2.getFullYear() &&
+         d1.getMonth() === d2.getMonth() &&
+         d1.getDate() === d2.getDate();
 }
 
 app.get("/partite", async (req, res) => {
@@ -30,55 +32,61 @@ app.get("/partite", async (req, res) => {
     const giorno = req.query.giorno || "today";
     const now = new Date();
 
-    let date;
-    if (giorno === "yesterday") {
-      date = new Date(now);
-      date.setDate(date.getDate() - 1);
-    } else if (giorno === "tomorrow") {
-      date = new Date(now);
-      date.setDate(date.getDate() + 1);
-    } else {
-      date = now;
-    }
+    let target = new Date(now);
+    if (giorno === "yesterday") target.setDate(target.getDate() - 1);
+    if (giorno === "tomorrow") target.setDate(target.getDate() + 1);
 
-    const dataQuery = formatDate(date);
-    let risultati = [];
+    let tutte = [];
 
     for (const league of LEAGUES) {
       const r = await fetch(
-        `https://www.thesportsdb.com/api/v1/json/3/eventsday.php?d=${dataQuery}&l=${league.name}`
+        `https://www.thesportsdb.com/api/v1/json/3/eventsnextleague.php?id=${league.id}`
       );
       const d = await r.json();
       if (!d.events) continue;
 
       d.events.forEach(ev => {
-        risultati.push({
-          lega: ev.strLeague,
+        if (!ev.dateEvent) return;
+        const dt = new Date(ev.dateEvent + "T" + (ev.strTime || "12:00"));
+        tutte.push({
+          lega: ev.strLeague || league.name,
           casa: ev.strHomeTeam,
           trasferta: ev.strAwayTeam,
           data: ev.dateEvent,
-          ora: ev.strTime || "TBD"
+          ora: ev.strTime || "TBD",
+          timestamp: dt
         });
       });
     }
 
+    // filtra per giorno
+    let filtrate = tutte.filter(p => sameDay(p.timestamp, target));
+
+    // se vuoto, fallback: mostra prossime partite
+    if (filtrate.length === 0) {
+      filtrate = tutte
+        .filter(p => p.timestamp >= now)
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .slice(0, 20);
+    }
+
     // rimuove duplicati
-    const unici = [];
-    const chiavi = new Set();
-    for (const p of risultati) {
+    const unique = [];
+    const seen = new Set();
+    for (const p of filtrate) {
       const k = p.lega + p.casa + p.trasferta + p.data;
-      if (!chiavi.has(k)) {
-        chiavi.add(k);
-        unici.push(p);
+      if (!seen.has(k)) {
+        seen.add(k);
+        unique.push(p);
       }
     }
 
-    res.json(unici);
+    res.json(unique);
   } catch (e) {
-    res.status(500).json({ error: "Errore backend" });
+    res.status(500).json({ error: "Errore backend stabile" });
   }
 });
 
 app.listen(PORT, () => {
-  console.log("Backend avviato sulla porta " + PORT);
+  console.log("Backend stabile avviato sulla porta " + PORT);
 });
