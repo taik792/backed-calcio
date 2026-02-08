@@ -18,7 +18,7 @@ const LEAGUES = [
   { id: 4500, name: "Europa League" }
 ];
 
-// Homepage di test
+// Homepage
 app.get("/", (req, res) => {
   res.send("Backend calcio attivo ✅");
 });
@@ -47,7 +47,7 @@ app.get("/partite", async (req, res) => {
       d.events.forEach(ev => {
         const t = new Date(ev.dateEvent + "T" + (ev.strTime || "20:00"));
         tutte.push({
-          lega: league.name,
+          lega: ev.strLeague || league.name,
           casa: ev.strHomeTeam,
           trasferta: ev.strAwayTeam,
           data: ev.dateEvent,
